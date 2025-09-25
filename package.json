@@ -38,13 +38,30 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/nexus-aissam/express-async-super.git"
+    "url": "git+https://github.com/nexus-aissam/express-async-super.git"
+  },
+  "homepage": "https://github.com/nexus-aissam/express-async-super#readme",
+  "bugs": {
+    "url": "https://github.com/nexus-aissam/express-async-super/issues"
   },
   "author": "Aissam <aissamirhir@gmail.com>",
   "license": "MIT",
   "engines": {
-    "node": ">=16.0.0"
+    "node": ">=16.0.0",
+    "npm": ">=7.0.0"
   },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "require": "./dist/index.js",
+      "import": "./dist/index.js"
+    }
+  },
+  "sideEffects": false,
   "peerDependencies": {
     "express": "^4.18.0 || ^5.0.0"
   },
