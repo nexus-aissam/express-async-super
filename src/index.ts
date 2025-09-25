@@ -52,10 +52,16 @@ export default asyncSuperInstance;
  * @example
  * ```javascript
  * import { asyncSuper, asyncHandler } from 'express-async-super';
+ * // Now you can use: asyncSuper.global(), asyncSuper.wrap(), etc.
+ *
+ * // Or use the default export
+ * import asyncSuper from 'express-async-super';
+ * app.use(asyncSuper.global());
  * ```
  */
 export {
   asyncSuperInstance as asyncSuper,
+  asyncSuperInstance, // Export instance directly for full access
   AsyncWrapper,
   createGlobalMiddleware,
   patchExpressApp,
