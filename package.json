@@ -1,6 +1,6 @@
 {
   "name": "express-async-super",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Intelligent global async error handling for Express.js - eliminates the need for manual try/catch blocks",
   "keywords": [
     "express",
@@ -30,7 +30,7 @@
     "lint:fix": "eslint src/**/*.ts --fix",
     "typecheck": "tsc --noEmit",
     "dev": "ts-node examples/basic.ts",
-    "prepublishOnly": "npm run build && npm run test",
+    "prepublishOnly": "npm run build:prod",
     "clean": "rm -rf dist"
   },
   "repository": {
