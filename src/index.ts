@@ -17,6 +17,7 @@ import { createRequestContext, createEnhancedError, isAsyncFunction } from './ut
 
 /**
  * Main AsyncSuper class implementation
+ * @internal
  */
 class AsyncSuperImpl implements AsyncSuper {
   private asyncWrapper: AsyncWrapper;
@@ -27,7 +28,33 @@ class AsyncSuperImpl implements AsyncSuper {
   }
 
   /**
-   * Configure global async error handling for Express app
+   * Configure global async error handling for Express application.
+   * This middleware automatically catches and handles errors from all async route handlers.
+   * 
+   * @param config - Configuration options for async error handling
+   * @returns Express middleware function
+   * 
+   * @example
+   * ```javascript
+   * // Basic usage - zero configuration
+   * app.use(asyncSuper.global());
+   * 
+   * // With options
+   * app.use(asyncSuper.global({
+   *   errorLogging: true,
+   *   performance: true,
+   *   correlationId: true,
+   *   performanceThreshold: 500
+   * }));
+   * 
+   * // Custom error handler
+   * app.use(asyncSuper.global({
+   *   errorHandler: (error, req, res, next) => {
+   *     console.log('Custom error handling:', error.correlationId);
+   *     next(error);
+   *   }
+   * }));
+   * ```
    */
   public global(config: GlobalAsyncSuperConfig = {}): RequestHandler {
     this.currentConfig = config;
@@ -40,56 +67,246 @@ class AsyncSuperImpl implements AsyncSuper {
   }
 
   /**
-   * Wrap individual async route handler
+   * Wrap individual async route handler with error catching.
+   * Use this for fine-grained control when you don't want global middleware.
+   * 
+   * @param handler - Async route handler function
+   * @returns Wrapped route handler with automatic error handling
+   * 
+   * @example
+   * ```javascript
+   * // Wrap specific route
+   * app.get('/users', asyncSuper.wrap(async (req, res) => {
+   *   const users = await User.findAll();
+   *   res.json(users);
+   * }));
+   * 
+   * // Works with route parameters
+   * app.get('/users/:id', asyncSuper.wrap(async (req, res) => {
+   *   const user = await User.findById(req.params.id);
+   *   if (!user) throw new Error('User not found');
+   *   res.json(user);
+   * }));
+   * ```
    */
   public wrap<T extends AsyncRouteHandler>(handler: T): WrappedRouteHandler {
     return this.asyncWrapper.wrapRouteHandler(handler);
   }
 
   /**
-   * Wrap individual async error handler
+   * Wrap async error handler middleware.
+   * Useful for async operations within error handling middleware.
+   * 
+   * @param handler - Async error handler function
+   * @returns Wrapped error handler with automatic error handling
+   * 
+   * @example
+   * ```javascript
+   * // Async error logging
+   * app.use(asyncSuper.wrapError(async (err, req, res, next) => {
+   *   await logErrorToDatabase(err);
+   *   await notifyAdmins(err);
+   *   res.status(500).json({ error: 'Internal server error' });
+   * }));
+   * 
+   * // Async error recovery
+   * app.use('/api', asyncSuper.wrapError(async (err, req, res, next) => {
+   *   if (err.code === 'NETWORK_ERROR') {
+   *     await retryFailedOperation(req);
+   *   }
+   *   next(err);
+   * }));
+   * ```
    */
   public wrapError<T extends AsyncErrorHandler>(handler: T): WrappedErrorHandler {
     return this.asyncWrapper.wrapErrorHandler(handler);
   }
 
   /**
-   * Create request context manually
+   * Manually create request context for tracking.
+   * Useful for custom middleware or when you need context outside of routes.
+   * 
+   * @param req - Express request object
+   * @returns Request context with correlation ID and metadata
+   * 
+   * @example
+   * ```javascript
+   * // In custom middleware
+   * app.use((req, res, next) => {
+   *   req.customContext = asyncSuper.createContext(req);
+   *   console.log('Request ID:', req.customContext.correlationId);
+   *   next();
+   * });
+   * 
+   * // In route handler
+   * app.get('/debug', (req, res) => {
+   *   const context = asyncSuper.createContext(req);
+   *   res.json({
+   *     correlationId: context.correlationId,
+   *     timestamp: context.startTime,
+   *     metadata: context.metadata
+   *   });
+   * });
+   * ```
    */
   public createContext(req: Request): RequestContext {
     return createRequestContext(req);
   }
 
   /**
-   * Enhance error with additional context manually
+   * Manually enhance an error with additional context and debugging information.
+   * 
+   * @param error - Original error to enhance
+   * @param req - Optional Express request object
+   * @param context - Optional additional context data
+   * @returns Enhanced error with debugging information
+   * 
+   * @example
+   * ```javascript
+   * // Enhance error in catch block
+   * try {
+   *   await riskyOperation();
+   * } catch (error) {
+   *   const enhanced = asyncSuper.enhanceError(error, req, {
+   *     operation: 'riskyOperation',
+   *     userId: req.user?.id
+   *   });
+   *   throw enhanced;
+   * }
+   * 
+   * // Add context to thrown errors
+   * app.get('/process/:id', async (req, res) => {
+   *   try {
+   *     await processData(req.params.id);
+   *   } catch (error) {
+   *     const enhanced = asyncSuper.enhanceError(error, req, {
+   *       dataId: req.params.id,
+   *       timestamp: new Date()
+   *     });
+   *     throw enhanced; // Will be caught by global handler
+   *   }
+   * });
+   * ```
    */
   public enhanceError(error: Error, req?: Request, context?: any): EnhancedError {
     return createEnhancedError(error, req, context);
   }
 
   /**
-   * Get performance metrics for route
+   * Get performance metrics for routes.
+   * Useful for monitoring and debugging slow operations.
+   * 
+   * @param route - Optional route path to filter metrics
+   * @returns Array of performance metrics
+   * 
+   * @example
+   * ```javascript
+   * // Get all metrics
+   * app.get('/admin/metrics', (req, res) => {
+   *   const allMetrics = asyncSuper.getMetrics();
+   *   res.json(allMetrics);
+   * });
+   * 
+   * // Get metrics for specific route
+   * app.get('/admin/metrics/users', (req, res) => {
+   *   const userRouteMetrics = asyncSuper.getMetrics('/users');
+   *   res.json(userRouteMetrics);
+   * });
+   * 
+   * // Monitor slow operations
+   * setInterval(() => {
+   *   const metrics = asyncSuper.getMetrics();
+   *   const slowOps = metrics.filter(m => m.isSlowOperation);
+   *   if (slowOps.length > 0) {
+   *     console.warn('Slow operations detected:', slowOps);
+   *   }
+   * }, 30000);
+   * ```
    */
   public getMetrics(route?: string): PerformanceMetrics[] {
     return this.asyncWrapper.getPerformanceMetrics(route);
   }
 
   /**
-   * Clear performance metrics
+   * Clear all stored performance metrics.
+   * Useful for memory management and resetting monitoring data.
+   * 
+   * @example
+   * ```javascript
+   * // Clear metrics endpoint
+   * app.delete('/admin/metrics', (req, res) => {
+   *   asyncSuper.clearMetrics();
+   *   res.json({ message: 'Metrics cleared successfully' });
+   * });
+   * 
+   * // Periodic cleanup
+   * setInterval(() => {
+   *   asyncSuper.clearMetrics();
+   *   console.log('Metrics cleared for memory management');
+   * }, 3600000); // Every hour
+   * ```
    */
   public clearMetrics(): void {
     this.asyncWrapper.clearPerformanceMetrics();
   }
 
   /**
-   * Check if function is async
+   * Check if a function is async (returns a Promise).
+   * Useful for dynamic function wrapping and validation.
+   * 
+   * @param fn - Function to check
+   * @returns True if function is async
+   * 
+   * @example
+   * ```javascript
+   * // Validate handlers before wrapping
+   * function smartWrap(handler) {
+   *   if (asyncSuper.isAsyncFunction(handler)) {
+   *     return asyncSuper.wrap(handler);
+   *   }
+   *   return handler; // Regular sync handler
+   * }
+   * 
+   * // Dynamic route setup
+   * const handlers = [syncHandler, asyncHandler, anotherAsyncHandler];
+   * handlers.forEach(handler => {
+   *   if (asyncSuper.isAsyncFunction(handler)) {
+   *     console.log('Wrapping async handler');
+   *     app.use(asyncSuper.wrap(handler));
+   *   } else {
+   *     app.use(handler);
+   *   }
+   * });
+   * ```
    */
   public isAsyncFunction(fn: Function): boolean {
     return this.asyncWrapper.isAsyncFunction(fn);
   }
 
   /**
-   * Get current configuration
+   * Get current configuration settings.
+   * Useful for debugging and runtime inspection.
+   * 
+   * @returns Current configuration or null if not set
+   * 
+   * @example
+   * ```javascript
+   * // Debug endpoint
+   * app.get('/debug/config', (req, res) => {
+   *   const config = asyncSuper.getConfig();
+   *   res.json({
+   *     hasConfig: config !== null,
+   *     errorLogging: config?.errorLogging,
+   *     performance: config?.performance,
+   *     correlationId: config?.correlationId
+   *   });
+   * });
+   * 
+   * // Conditional behavior
+   * if (asyncSuper.getConfig()?.performance) {
+   *   console.log('Performance monitoring is enabled');
+   * }
+   * ```
    */
   public getConfig(): GlobalAsyncSuperConfig | null {
     return this.currentConfig ? { ...this.currentConfig } : null;
@@ -97,17 +314,42 @@ class AsyncSuperImpl implements AsyncSuper {
 }
 
 /**
- * Global instance
+ * Global AsyncSuper instance - ready to use!
+ * @internal
  */
 const asyncSuperInstance = new AsyncSuperImpl();
 
 /**
- * Default export - the main AsyncSuper instance
+ * Express Async Super - Intelligent async error handling for Express.js
+ * 
+ * Eliminates the need for manual try/catch blocks in async route handlers.
+ * Just add `app.use(asyncSuper.global())` and all your async routes are protected!
+ * 
+ * @example
+ * ```javascript
+ * const express = require('express');
+ * const asyncSuper = require('express-async-super');
+ * 
+ * const app = express();
+ * app.use(asyncSuper.global()); // Enable global async error handling
+ * 
+ * // All async routes automatically handle errors
+ * app.get('/users', async (req, res) => {
+ *   const users = await User.findAll(); // No try/catch needed!
+ *   res.json(users);
+ * });
+ * 
+ * app.listen(3000);
+ * ```
  */
 export default asyncSuperInstance;
 
 /**
  * Named exports for specific functionality
+ * @example
+ * ```javascript
+ * import { asyncSuper, asyncHandler } from 'express-async-super';
+ * ```
  */
 export {
   asyncSuperInstance as asyncSuper,
@@ -161,14 +403,52 @@ export {
 } from './core/route-patcher';
 
 /**
- * Convenience function for quick setup
+ * Convenience function for quick setup with configuration.
+ * Alternative to `asyncSuper.global(config)`.
+ * 
+ * @param config - Configuration options
+ * @returns Express middleware function
+ * 
+ * @example
+ * ```javascript
+ * // Quick setup with config
+ * app.use(setupAsyncSuper({
+ *   errorLogging: true,
+ *   performance: true,
+ *   correlationId: true
+ * }));
+ * 
+ * // Equivalent to:
+ * // app.use(asyncSuper.global({ ... }));
+ * ```
  */
 export function setupAsyncSuper(config: GlobalAsyncSuperConfig = {}) {
   return asyncSuperInstance.global(config);
 }
 
 /**
- * Type-safe wrapper function for async route handlers
+ * Type-safe wrapper function for individual async route handlers.
+ * Alternative to `asyncSuper.wrap(handler)`.
+ * 
+ * @param handler - Async route handler function
+ * @returns Wrapped handler with automatic error handling
+ * 
+ * @example
+ * ```javascript
+ * // Functional style wrapping
+ * const getUsers = asyncHandler(async (req, res) => {
+ *   const users = await User.findAll();
+ *   res.json(users);
+ * });
+ * 
+ * app.get('/users', getUsers);
+ * 
+ * // Direct usage
+ * app.get('/posts', asyncHandler(async (req, res) => {
+ *   const posts = await Post.findAll();
+ *   res.json(posts);
+ * }));
+ * ```
  */
 export function asyncHandler(
   handler: AsyncRouteHandler
@@ -177,7 +457,31 @@ export function asyncHandler(
 }
 
 /**
- * Type-safe wrapper function for async error handlers
+ * Type-safe wrapper function for async error handlers.
+ * Alternative to `asyncSuper.wrapError(handler)`.
+ * 
+ * @param handler - Async error handler function
+ * @returns Wrapped error handler with automatic error handling
+ * 
+ * @example
+ * ```javascript
+ * // Async error logging middleware
+ * const errorLogger = asyncErrorHandler(async (err, req, res, next) => {
+ *   await logToDatabase(err);
+ *   await sendAlert(err);
+ *   next(err);
+ * });
+ * 
+ * app.use(errorLogger);
+ * 
+ * // Async error recovery
+ * app.use('/api', asyncErrorHandler(async (err, req, res, next) => {
+ *   if (err.retryable) {
+ *     await retryOperation(req);
+ *   }
+ *   next(err);
+ * }));
+ * ```
  */
 export function asyncErrorHandler(
   handler: (error: Error, req: Request, res: any, next: any) => Promise<void>

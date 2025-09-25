@@ -7,29 +7,105 @@ import {
 } from "express";
 
 /**
- * Core configuration options for express-async-super
+ * Core configuration options for express-async-super.
+ * Configure how async errors are handled, logged, and monitored.
+ * 
+ * @example
+ * ```javascript
+ * const config = {
+ *   errorLogging: true,
+ *   performance: true,
+ *   performanceThreshold: 500,
+ *   correlationId: true,
+ *   logger: (message, level, context) => {
+ *     console.log(`[${level.toUpperCase()}] ${message}`, context);
+ *   }
+ * };
+ * 
+ * app.use(asyncSuper.global(config));
+ * ```
  */
 export interface AsyncSuperConfig {
-  /** Enable error logging to console */
+  /** 
+   * Enable enhanced error logging to console.
+   * Logs caught errors with additional context like correlation ID, route, duration.
+   * @default true
+   * @example errorLogging: true
+   */
   errorLogging?: boolean;
-  /** Enable performance monitoring for async operations */
+  
+  /** 
+   * Enable performance monitoring for async operations.
+   * Tracks execution time and memory usage of async route handlers.
+   * @default false
+   * @example performance: true
+   */
   performance?: boolean;
-  /** Enable automatic error recovery suggestions */
+  
+  /** 
+   * Enable automatic error recovery suggestions.
+   * Adds helpful suggestions to errors based on error type and context.
+   * @default false
+   * @example recovery: true
+   */
   recovery?: boolean;
-  /** Custom error handler for enhanced errors */
+  
+  /** 
+   * Custom error handler for processing enhanced errors.
+   * Called before passing error to Express error handling middleware.
+   * @param error - Enhanced error with context
+   * @param req - Express request object
+   * @param res - Express response object
+   * @param next - Express next function
+   * @example
+   * errorHandler: (error, req, res, next) => {
+   *   // Log to monitoring service
+   *   monitoring.logError(error, req.correlationId);
+   *   next(error);
+   * }
+   */
   errorHandler?: (
     error: EnhancedError,
     req: Request,
     res: Response,
     next: NextFunction
   ) => void;
-  /** Performance threshold in milliseconds to log slow operations */
+  
+  /** 
+   * Performance threshold in milliseconds to log slow operations.
+   * Operations exceeding this threshold will be flagged as slow.
+   * @default 1000
+   * @example performanceThreshold: 500
+   */
   performanceThreshold?: number;
-  /** Maximum number of errors to track in context */
+  
+  /** 
+   * Maximum number of errors to track per request context.
+   * Prevents memory leaks from requests with many errors.
+   * @default 10
+   * @example maxErrorHistory: 5
+   */
   maxErrorHistory?: number;
-  /** Enable request correlation ID tracking */
+  
+  /** 
+   * Enable request correlation ID tracking.
+   * Automatically generates unique IDs for request tracing.
+   * @default true
+   * @example correlationId: true
+   */
   correlationId?: boolean;
-  /** Custom logger function */
+  
+  /** 
+   * Custom logger function for async-super messages.
+   * Replace default console logging with your preferred logging solution.
+   * @param message - Log message
+   * @param level - Log level (info, warn, error)
+   * @param context - Additional context data
+   * @example
+   * logger: (message, level, context) => {
+   *   winston.log(level, message, context);
+   * }
+   */
   logger?: (
     message: string,
     level: "info" | "warn" | "error",
@@ -38,46 +114,143 @@ export interface AsyncSuperConfig {
 }
 
 /**
- * Enhanced error with additional context and debugging information
+ * Enhanced error with additional context and debugging information.
+ * All caught async errors are automatically enhanced with request context,
+ * timing information, and debugging aids.
+ * 
+ * @example
+ * ```javascript
+ * app.use((err, req, res, next) => {
+ *   if (err.correlationId) {
+ *     console.log('Enhanced error:', {
+ *       message: err.message,
+ *       correlationId: err.correlationId,
+ *       route: err.routePath,
+ *       duration: err.duration,
+ *       suggestions: err.suggestions
+ *     });
+ *   }
+ *   res.status(500).json({ error: 'Internal server error', id: err.correlationId });
+ * });
+ * ```
  */
 export interface EnhancedError extends Error {
-  /** Original error that was caught */
+  /** 
+   * Original error that was caught before enhancement.
+   * Useful for accessing original error properties.
+   */
   originalError?: Error;
-  /** Express request object when error occurred */
+  
+  /** 
+   * Express request object when error occurred.
+   * Contains full request context including headers, params, body.
+   */
   request?: Request;
-  /** Route path where error occurred */
+  
+  /** 
+   * Route path where error occurred (e.g., '/users/:id').
+   * Helps identify which endpoint caused the error.
+   */
   routePath?: string;
-  /** HTTP method where error occurred */
+  
+  /** 
+   * HTTP method where error occurred (GET, POST, etc.).
+   * Combined with routePath gives full endpoint identification.
+   */
   method?: string;
-  /** Request correlation ID */
+  
+  /** 
+   * Request correlation ID for distributed tracing.
+   * Unique identifier to track requests across services.
+   */
   correlationId?: string;
-  /** Timestamp when error occurred */
+  
+  /** 
+   * Timestamp when error occurred.
+   * Useful for debugging timing issues and log correlation.
+   */
   timestamp?: Date;
-  /** Duration of async operation before error */
+  
+  /** 
+   * Duration of async operation before error (in milliseconds).
+   * Helps identify if error was due to timeout or slow operation.
+   */
   duration?: number;
-  /** Suggested recovery actions */
+  
+  /** 
+   * Suggested recovery actions for this error.
+   * Human-readable suggestions for debugging and fixing the error.
+   */
   suggestions?: string[];
-  /** Additional context data */
+  
+  /** 
+   * Additional context data attached to the error.
+   * Custom data added during error enhancement.
+   */
   context?: Record<string, any>;
-  /** Error classification */
+  
+  /** 
+   * Error classification for automatic handling.
+   * Categorizes errors for appropriate response handling.
+   */
   category?: ErrorCategory;
-  /** Whether error is retryable */
+  
+  /** 
+   * Whether error is retryable.
+   * Indicates if the operation could succeed on retry.
+   */
   retryable?: boolean;
-  /** Stack trace from async operation start */
+  
+  /** 
+   * Stack trace from async operation start.
+   * Enhanced stack trace showing async call chain.
+   */
   asyncStack?: string;
 }
 
 /**
- * Error categories for classification
+ * Error categories for automatic classification and handling.
+ * Helps determine appropriate response codes and recovery strategies.
+ * 
+ * @example
+ * ```javascript
+ * app.use((err, req, res, next) => {
+ *   switch (err.category) {
+ *     case ErrorCategory.VALIDATION:
+ *       return res.status(400).json({ error: 'Invalid input', details: err.message });
+ *     case ErrorCategory.AUTHENTICATION:
+ *       return res.status(401).json({ error: 'Authentication required' });
+ *     case ErrorCategory.DATABASE:
+ *       return res.status(503).json({ error: 'Service temporarily unavailable' });
+ *     default:
+ *       return res.status(500).json({ error: 'Internal server error' });
+ *   }
+ * });
+ * ```
  */
 export enum ErrorCategory {
+  /** Database connection, query, or constraint errors */
   DATABASE = "database",
+  
+  /** Network timeouts, connection failures, external API errors */
   NETWORK = "network",
+  
+  /** Input validation, schema validation, parameter errors */
   VALIDATION = "validation",
+  
+  /** Login failures, token validation, credential errors */
   AUTHENTICATION = "authentication",
+  
+  /** Permission denied, access control, role-based errors */
   AUTHORIZATION = "authorization",
+  
+  /** Domain-specific logic errors, business rule violations */
   BUSINESS_LOGIC = "business_logic",
+  
+  /** System errors, file system, memory, configuration issues */
   SYSTEM = "system",
+  
+  /** Uncategorized or unidentified errors */
   UNKNOWN = "unknown",
 }
 

@@ -1,0 +1,22 @@
+{
+  "source": {
+    "include": ["./src/", "./README.md"],
+    "includePattern": "\\.(js|ts)$",
+    "exclude": ["node_modules/", "dist/", "tests/"]
+  },
+  "opts": {
+    "destination": "./docs/jsdoc/",
+    "recurse": true
+  },
+  "plugins": [
+    "plugins/markdown",
+    "jsdoc-plugin-typescript"
+  ],
+  "templates": {
+    "cleverLinks": false,
+    "monospaceLinks": false
+  },
+  "typescript": {
+    "moduleRoot": "src"
+  }
+}
