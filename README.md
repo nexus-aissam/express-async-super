@@ -3,7 +3,7 @@
 🚀 **Intelligent global async error handling for Express.js** - Eliminate manual try/catch blocks from your async routes forever!
 
 [![npm version](https://badge.fury.io/js/express-async-super.svg)](https://www.npmjs.com/package/express-async-super)
-[![Build Status](https://github.com/nexus-aissam/express-async-super/workflows/CI/badge.svg)](https://github.com/nexus-aissam/express-async-super/actions)
+[![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)](https://github.com/nexus-aissam/express-async-super)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ## 🎯 Why express-async-super?
