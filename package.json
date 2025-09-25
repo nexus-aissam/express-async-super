@@ -1,6 +1,6 @@
 {
   "name": "express-async-super",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "description": "Intelligent global async error handling for Express.js - eliminates the need for manual try/catch blocks",
   "keywords": [
     "express",
