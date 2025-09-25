@@ -200,6 +200,7 @@ export function asyncErrorHandler(
 module.exports = asyncSuperInstance;
 module.exports.default = asyncSuperInstance;
 module.exports.asyncSuper = asyncSuperInstance;
+module.exports.asyncSuperInstance = asyncSuperInstance;
 module.exports.setupAsyncSuper = setupAsyncSuper;
 module.exports.asyncHandler = asyncHandler;
 module.exports.asyncErrorHandler = asyncErrorHandler;
